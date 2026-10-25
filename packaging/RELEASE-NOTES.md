@@ -4,6 +4,8 @@ CentOS 7.9 x86_64 / Webtatic php71w RPM 更新包，包含 CVE-2026-109618 与 C
 
 安装命令：
 
+引导脚本默认在每次运行时选择 GitHub Releases 的最新正式版，再固定标签下载全部文件；支持镜像加速。指定版本可用 `sudo bash install.sh --tag v7.1.33-cve20261025-r2`，`--tag latest` 自动选择最新版。
+
 官方源一键安装：
 
 ```bash
