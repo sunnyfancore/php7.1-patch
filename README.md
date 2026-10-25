@@ -6,6 +6,20 @@
 
 ## 二进制下载与安装
 
+官方源一键命令：
+
+```bash
+curl -fL --retry 3 -o install.sh https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh
+```
+
+镜像加速一键命令（示例使用第三方 ghfast.top，可换成可用的 GitHub 代理前缀）：
+
+```bash
+curl -fL --retry 3 -o install.sh https://ghfast.top/https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh --mirror-prefix https://ghfast.top/
+```
+
+加速作用于引导脚本、Release 安装器、RPM 合集及校验文件。两种方式均校验 SHA256，安装后默认重启已运行的 FPM/httpd。若计划手动安排重启，追加 `--no-restart`。`bash install.sh --help` 也列出两种命令。CentOS/EPEL 系统依赖仍由其归档仓库下载。
+
 下载 [Releases](https://github.com/sunnyfancore/php7.1-patch/releases) 的 `php71w-centos7.9-x86_64-rpms.tar.gz`，或者直接安装：
 
 ```bash
