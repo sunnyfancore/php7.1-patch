@@ -1,0 +1,83 @@
+name: CentOS 7.9 Webtatic-compatible RPMs
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag created only after all build and runtime checks pass
+        required: true
+        default: v7.1.33-cve20261025-r1
+      publish:
+        description: Publish tested binaries to GitHub Releases
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: centos7-rpm-release
+  cancel-in-progress: false
+
+jobs:
+  build-test-release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: write
+    env:
+      CENTOS_IMAGE: centos@sha256:dead07b4d8ed7e29e98de0f4504d87e8880d4347859d839686a31da35a3b532f
+      SOURCE_COMMIT: ${{ github.sha }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate release identity
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v7\.1\.33-cve20261025-r1$ ]]
+      - name: Build RPMs inside CentOS 7.9 / glibc 2.17
+        run: |
+          docker pull "$CENTOS_IMAGE"
+          docker run --rm -v "$GITHUB_WORKSPACE:/src" \
+            -e SOURCE_COMMIT -e RELEASE_TAG -e RUN_URL -e JOBS=2 \
+            "$CENTOS_IMAGE" bash /src/ci/build-rpms.sh
+      - name: Install and test in a fresh CentOS 7.9 container
+        run: |
+          docker run -d --name php71-runtime -p 127.0.0.1:9071:9071 \
+            -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash -c '
+            set -euo pipefail
+            bash /src/dist/install-php71.sh --fresh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS
+            bash /src/ci/test-cli.sh
+            echo "; CI configuration preservation marker" >> /etc/php.ini
+            sha256sum /etc/php.ini > /tmp/php-ini-before
+            bash /src/dist/install-php71.sh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS
+            sha256sum -c /tmp/php-ini-before
+            exec /usr/sbin/php-fpm -F -y /src/ci/fpm-test.conf'
+          python3 ci/test-fpm.py | tee dist/fpm-test.log
+      - name: Collect runtime results
+        if: always()
+        run: |
+          mkdir -p dist
+          docker logs php71-runtime > dist/runtime-test.log 2>&1 || true
+          docker rm -f php71-runtime || true
+          sudo chown -R "$(id -u):$(id -g)" dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: centos7.9-rpms-and-logs
+          path: dist/
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Publish tested binaries
+        if: success() && inputs.publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --target "$SOURCE_COMMIT" \
+            --title "PHP 7.1.33 CVE mitigations r1 — CentOS 7.9 x86_64 RPMs" \
+            --notes-file dist/RELEASE-NOTES.md \
+            dist/php71w-centos7.9-x86_64-rpms.tar.gz \
+            dist/*.src.rpm dist/install-php71.sh dist/SHA256SUMS \
+            dist/BUILDINFO.json dist/PACKAGES.tsv dist/CONFIGFILES.txt \
+            dist/verify-patch.php dist/fpm-test.log dist/runtime-test.log

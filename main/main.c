@@ -26,6 +26,7 @@
 #define ZEND_INCLUDE_FULL_WINDOWS_HEADERS
 
 #include "php.h"
+#include "php_cve_patch.h"
 #include <stdio.h>
 #include <fcntl.h>
 #ifdef PHP_WIN32
@@ -2008,6 +2009,8 @@ static void core_globals_dtor(php_core_globals *core_globals)
 PHP_MINFO_FUNCTION(php_core) { /* {{{ */
 	php_info_print_table_start();
 	php_info_print_table_row(2, "PHP Version", PHP_VERSION);
+	php_info_print_table_row(2, "CVE Patch ID", PHP_CVE_PATCH_ID);
+	php_info_print_table_row(2, "CVE Patch Build", PHP_CVE_PATCH_BUILD);
 	php_info_print_table_end();
 	DISPLAY_INI_ENTRIES();
 }
@@ -2179,6 +2182,8 @@ int php_module_startup(sapi_module_struct *sf, zend_module_entry *additional_mod
 
 	/* Register constants */
 	REGISTER_MAIN_STRINGL_CONSTANT("PHP_VERSION", PHP_VERSION, sizeof(PHP_VERSION)-1, CONST_PERSISTENT | CONST_CS);
+	REGISTER_MAIN_STRINGL_CONSTANT("PHP_CVE_PATCH_ID", PHP_CVE_PATCH_ID, sizeof(PHP_CVE_PATCH_ID)-1, CONST_PERSISTENT | CONST_CS);
+	REGISTER_MAIN_STRINGL_CONSTANT("PHP_CVE_PATCH_BUILD", PHP_CVE_PATCH_BUILD, sizeof(PHP_CVE_PATCH_BUILD)-1, CONST_PERSISTENT | CONST_CS);
 	REGISTER_MAIN_LONG_CONSTANT("PHP_MAJOR_VERSION", PHP_MAJOR_VERSION, CONST_PERSISTENT | CONST_CS);
 	REGISTER_MAIN_LONG_CONSTANT("PHP_MINOR_VERSION", PHP_MINOR_VERSION, CONST_PERSISTENT | CONST_CS);
 	REGISTER_MAIN_LONG_CONSTANT("PHP_RELEASE_VERSION", PHP_RELEASE_VERSION, CONST_PERSISTENT | CONST_CS);

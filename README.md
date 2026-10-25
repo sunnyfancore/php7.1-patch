@@ -1,39 +1,72 @@
-The PHP Interpreter
-===================
+# PHP 7.1 CVE 回移植与 CentOS 7.9 RPM
 
-This is the github mirror of the official PHP repository located at
-http://git.php.net.
+为 **CentOS 7.9 x86_64 + Webtatic php71w** 提供 CVE-2026-109618 / CVE-2026-109619 缓解更新，保留 `/usr/bin/php`、`/etc/php.ini`、`/etc/php.d/`、`/usr/lib64/php/modules` 和 RPM 包管理方式。
 
-[![Build Status](https://secure.travis-ci.org/php/php-src.svg?branch=master)](http://travis-ci.org/php/php-src)
-[![Build status](https://ci.appveyor.com/api/projects/status/meyur6fviaxgdwdy?svg=true)](https://ci.appveyor.com/project/php/php-src)
+源码历史：第一提交是完整官方 7.1.33；第二提交只提取 17 文件 CVE 补丁；后续提交加入版本标识和 Actions/RPM 打包。没有使用宝塔安装脚本或 `/www` 目录。
 
-Pull Requests
-=============
-PHP accepts pull requests via github. Discussions are done on github, but
-depending on the topic can also be relayed to the official PHP developer
-mailing list internals@lists.php.net.
+## 二进制下载与安装
 
-New features require an RFC and must be accepted by the developers.
-See https://wiki.php.net/rfc and https://wiki.php.net/rfc/voting for more
-information on the process.
+下载 [Releases](https://github.com/sunnyfancore/php7.1-patch/releases) 的 `php71w-centos7.9-x86_64-rpms.tar.gz`，或者直接安装：
 
-Bug fixes **do not** require an RFC, but require a bugtracker ticket. Always
-open a ticket at https://bugs.php.net and reference the bug id using #NNNNNN.
+```bash
+TAG=v7.1.33-cve20261025-r1
+BASE="https://github.com/sunnyfancore/php7.1-patch/releases/download/$TAG"
+curl -fL --retry 3 -o install-php71.sh "$BASE/install-php71.sh"
+curl -fL --retry 3 -o SHA256SUMS "$BASE/SHA256SUMS"
+awk '$2 == "install-php71.sh" {print}' SHA256SUMS | sha256sum -c -
+sudo bash install-php71.sh --restart-services
+```
 
-    Fix #55371: get_magic_quotes_gpc() throws deprecation warning
+安装器备份配置和包清单到 `/var/backups/php71w-cve-*`，再由 YUM 同步更新本机已经安装且本次提供的同名 RPM。不会安装所有扩展，第三方 PECL 包继续保留；依赖不满足会中止，没有使用 `--nodeps`。配置遵循 `%config(noreplace)`，已有修改不会被覆盖。新安装显式加 `--fresh`，只安装 CLI/common/FPM。
 
-    After removing magic quotes, the get_magic_quotes_gpc function caused
-    a deprecate warning. get_magic_quotes_gpc can be used to detected
-    the magic_quotes behavior and therefore should not raise a warning at any
-    time. The patch removes this warning
+本项目 RPM 尚未签名，使用 HTTPS 和 SHA256 校验；发行版依赖仍检查官方 GPG 签名。依赖仅对本次事务启用临时 CentOS/EPEL 归档仓库，不改已有 `.repo`。若要回退，事先保留原版本 RPM；配置备份不能代替旧二进制。
 
-We do not merge pull requests directly on github. All PRs will be
-pulled and pushed through http://git.php.net.
+已下载二进制包可这样安装，缺少的系统依赖仍需网络：
 
+```bash
+sudo bash install-php71.sh --restart-services \
+  --package ./php71w-centos7.9-x86_64-rpms.tar.gz --checksums ./SHA256SUMS
+```
 
-Guidelines for contributors
-===========================
-- [CODING_STANDARDS](/CODING_STANDARDS)
-- [README.GIT-RULES](/README.GIT-RULES)
-- [README.MAILINGLIST_RULES](/README.MAILINGLIST_RULES)
-- [README.RELEASE_PROCESS](/README.RELEASE_PROCESS)
+## 升级后识别补丁
+
+```bash
+rpm -qf /usr/bin/php
+# php71w-cli-7.1.33-1.w7.cve20261025.r1.el7.x86_64
+php -v
+# PHP 7.1.33-cve20261025-r1 ...
+php -n /usr/local/share/php71w-cve/verify-patch.php
+php -r 'echo PHP_CVE_PATCH_ID, PHP_EOL, PHP_CVE_PATCH_BUILD, PHP_EOL;'
+# CVE-2026-109618+CVE-2026-109619;r1
+# <40 位源码提交号>
+php -i | grep 'CVE Patch'
+```
+
+版本后缀与常量编译在二进制中，`BUILDINFO.json` 记录构建来源；Actions 验证实际缓解行为。标识证明当前进程使用该构建，不能证明所有扩展或其它安全问题均已修复。
+
+CLI 与网站/FPM 可能不是同一进程。`--restart-services` 会检查并重启正在运行的 php-fpm，及使用 mod_php71w 的 httpd。常驻队列需另行重启。可在网站临时诊断页核对下列信息，完成后删除诊断页：
+
+```php
+<?php
+header('Content-Type: text/plain');
+echo PHP_VERSION, "\n";
+echo defined('PHP_CVE_PATCH_ID') ? PHP_CVE_PATCH_ID : 'UNPATCHED', "\n";
+echo defined('PHP_CVE_PATCH_BUILD') ? PHP_CVE_PATCH_BUILD : 'unknown', "\n";
+```
+
+## Actions 构建及发布
+
+Actions → **CentOS 7.9 Webtatic-compatible RPMs** → Run workflow。默认发布标签 `v7.1.33-cve20261025-r1`；关闭 `publish` 可只生成构建产物。所有测试成功后才创建 Release 和标签，不覆盖已有发布。
+
+固定 CentOS 7.9 amd64 容器内构建 Webtatic 子包，产出二进制 RPM 合集、源码 RPM、SHA256、包清单、构建信息。新容器验证安装和配置保留；CLI 验证标识/嵌套变量/字符串/OOM；FPM 验证同一 worker 连续请求、multipart 上限、文件上传、上传进度关闭和 OOM 后 worker 重建。
+
+打包来源见 [packaging/PROVENANCE.md](packaging/PROVENANCE.md)。
+
+## 行为与范围
+
+- 分配器 OOM 立即退出进程，不执行 shutdown 回调；FPM 重新生成 worker。
+- session 上传进度在源码层面关闭，普通文件上传可继续使用。
+- 新增 `max_multipart_body_parts`，默认 `-1` 表示 `max_input_vars + max_file_uploads`。
+- PHP API/Zend ABI 编号保持原值，第三方扩展与实际业务仍需验收。
+
+PHP 7.1 与 CentOS 7 均已停止维护。本项目只提供指定两个 CVE 的第三方缓解回移植，不是官方 PHP 7.1.34，也不覆盖其它已知漏洞。

@@ -174,3 +174,6 @@ UPGRADING.INTERNALS             merge=NEWS
 /Zend/tests/bug51176.phpt			-crlf
 /Zend/tests/each_003.phpt			-crlf
 /Zend/tests/errmsg_006.phpt			-crlf
+/.github/** text eol=lf
+/ci/** text eol=lf
+/packaging/** text eol=lf
