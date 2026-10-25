@@ -77,6 +77,13 @@ jobs:
           (cd dist && sha256sum *.gz *.rpm *.json *.tsv *.txt *.php *.sh *.md > SHA256SUMS)
       - name: Prepare artifact permissions
         run: sudo chown -R "$(id -u):$(id -g)" dist
+      - name: Retest allocator and VM on reused RPMs
+        if: inputs.reuse_run_id != ''
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash -c '
+            set -euo pipefail
+            bash /src/ci/setup-centos7.sh
+            bash /src/ci/test-allocator.sh' | tee dist/allocator-test.log
       - name: Install and test in a fresh CentOS 7.9 container
         run: |
           docker run -d --name php71-runtime -p 127.0.0.1:9071:9071 \
