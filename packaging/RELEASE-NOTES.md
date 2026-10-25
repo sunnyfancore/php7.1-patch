@@ -4,6 +4,20 @@ CentOS 7.9 x86_64 / Webtatic php71w RPM 更新包，包含 CVE-2026-109618 与 C
 
 安装命令：
 
+官方源一键安装：
+
+```bash
+curl -fL --retry 3 -o install.sh https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh
+```
+
+镜像加速一键安装（第三方代理示例，可替换前缀；同时加速安装器、RPM 合集和校验文件）：
+
+```bash
+curl -fL --retry 3 -o install.sh https://ghfast.top/https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh --mirror-prefix https://ghfast.top/
+```
+
+下列命令用于手动下载并校验 Release 安装器：
+
 ```bash
 TAG=v7.1.33-cve20261025-r1
 BASE="https://github.com/sunnyfancore/php7.1-patch/releases/download/$TAG"
