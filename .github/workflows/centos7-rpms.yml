@@ -115,7 +115,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$RELEASE_TAG" \
-            --target "$SOURCE_COMMIT" \
+            --target "$GITHUB_SHA" \
             --title "PHP 7.1.33 CVE mitigations r1 — CentOS 7.9 x86_64 RPMs" \
             --notes-file dist/RELEASE-NOTES.md \
             dist/php71w-centos7.9-x86_64-rpms.tar.gz \
