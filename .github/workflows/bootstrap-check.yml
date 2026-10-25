@@ -1,0 +1,17 @@
+name: One-command installer checks
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - ci/test-bootstrap.sh
+      - .github/workflows/bootstrap-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: sudo bash ci/test-bootstrap.sh
