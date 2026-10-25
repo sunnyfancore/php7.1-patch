@@ -31,10 +31,10 @@ cp packaging/install-rpms.sh dist/install-php71.sh
 sed -i "s/@RELEASE_TAG@/${RELEASE_TAG}/g" dist/install-php71.sh
 cp packaging/RELEASE-NOTES.md dist/RELEASE-NOTES.md
 python - <<'PY'
-import json,os,platform,subprocess
+import json,os,subprocess
 d={'version':'7.1.33-cve20261025-r1','patch_id':'CVE-2026-109618+CVE-2026-109619;r1',
    'source_commit':os.environ['SOURCE_COMMIT'],'release_tag':os.environ['RELEASE_TAG'],
-   'target':'CentOS 7.9 x86_64','glibc':platform.libc_ver(),
+   'target':'CentOS 7.9 x86_64','glibc':subprocess.check_output(['getconf','GNU_LIBC_VERSION']).decode().strip(),
    'webtatic_packaging_commit':'36d3aeb770d2133a7600ec229f599adaff3c2f3b',
    'run_url':os.environ.get('RUN_URL'),
    'rpm_list':subprocess.check_output(['rpm','-qa']).decode().splitlines()}
