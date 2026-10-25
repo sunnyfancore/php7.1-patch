@@ -1067,7 +1067,7 @@ ZEND_API int _array_init_singleton(zval *arg ZEND_FILE_LINE_DC) /* {{{ */
 {
 	ZVAL_NEW_ARR(arg);
 	_zend_hash_init(Z_ARRVAL_P(arg), 0, ZVAL_PTR_DTOR, 0 ZEND_FILE_LINE_RELAY_CC);
-	/* PHP 7.2 derives the hash mask from the table size (nTableMask == -nTableSize),
+	/* PHP 7.1 derives the hash mask from the table size (nTableMask == -nTableSize),
 	 * so a 1-bucket table would get a 4-byte hash area and a misaligned arData.
 	 * Use the smallest size that keeps the buckets properly aligned. */
 	Z_ARRVAL_P(arg)->nTableSize = 2;

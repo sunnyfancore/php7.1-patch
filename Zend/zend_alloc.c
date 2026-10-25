@@ -1753,6 +1753,11 @@ static void *zend_mm_alloc_huge(zend_mm_heap *heap, size_t size ZEND_FILE_LINE_D
 #endif
 	void *ptr;
 
+	/* Alignment must not wrap a huge allocation into a small mapping. */
+	if (UNEXPECTED(new_size < size)) {
+		zend_mm_safe_error_ex("Possible integer overflow in huge memory allocation (%zu)", size);
+	}
+
 #if ZEND_MM_LIMIT
 	if (UNEXPECTED(heap->real_size + new_size > heap->limit)) {
 		if (zend_mm_gc(heap) && heap->real_size + new_size <= heap->limit) {

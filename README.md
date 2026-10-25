@@ -18,12 +18,12 @@ curl -fL --retry 3 -o install.sh https://raw.githubusercontent.com/sunnyfancore/
 curl -fL --retry 3 -o install.sh https://ghfast.top/https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh --mirror-prefix https://ghfast.top/
 ```
 
-加速作用于引导脚本、Release 安装器、RPM 合集及校验文件。两种方式均校验 SHA256，安装后默认重启已运行的 FPM/httpd。若计划手动安排重启，追加 `--no-restart`。`bash install.sh --help` 也列出两种命令。CentOS/EPEL 系统依赖仍由其归档仓库下载。
+加速作用于引导脚本、Release 安装器、RPM 合集及校验文件。两种方式均校验 SHA256，安装后默认重启已运行的 FPM/httpd。`--no-restart` 只跳过安装器主动重启；原版/r1 FPM RPM 的旧卸载脚本仍可能触发重启，升级请安排维护窗口。r2 的新 RPM 已取消这项自动重启。`bash install.sh --help` 也列出两种命令。CentOS/EPEL 系统依赖仍由其归档仓库下载。
 
 下载 [Releases](https://github.com/sunnyfancore/php7.1-patch/releases) 的 `php71w-centos7.9-x86_64-rpms.tar.gz`，或者直接安装：
 
 ```bash
-TAG=v7.1.33-cve20261025-r1
+TAG=v7.1.33-cve20261025-r2
 BASE="https://github.com/sunnyfancore/php7.1-patch/releases/download/$TAG"
 curl -fL --retry 3 -o install-php71.sh "$BASE/install-php71.sh"
 curl -fL --retry 3 -o SHA256SUMS "$BASE/SHA256SUMS"
@@ -31,7 +31,7 @@ awk '$2 == "install-php71.sh" {print}' SHA256SUMS | sha256sum -c -
 sudo bash install-php71.sh --restart-services
 ```
 
-安装器备份配置和包清单到 `/var/backups/php71w-cve-*`，再由 YUM 同步更新本机已经安装且本次提供的同名 RPM。不会安装所有扩展，第三方 PECL 包继续保留；依赖不满足会中止，没有使用 `--nodeps`。配置遵循 `%config(noreplace)`，已有修改不会被覆盖。新安装显式加 `--fresh`，只安装 CLI/common/FPM。
+安装器备份配置和包清单到 `/var/backups/php71w-cve-*`，再由 YUM 同步更新本机已经安装且本次提供的同名 RPM。不会安装所有扩展，第三方 PECL 包继续保留；依赖不满足会中止，没有使用 `--nodeps`。配置遵循 `%config(noreplace)`，已有修改不会被覆盖。支持只有 FPM 而没有 CLI 的 php71w 安装；会检查 FPM 二进制标识和配置。按升级前记录的活动状态重启服务，重启或校验失败返回非零。CLI/FPM 扩展清单会在升级前后比较。新安装显式加 `--fresh`，只安装 CLI/common/FPM。
 
 本项目 RPM 尚未签名，使用 HTTPS 和 SHA256 校验；发行版依赖仍检查官方 GPG 签名。依赖仅对本次事务启用临时 CentOS/EPEL 归档仓库，不改已有 `.repo`。若要回退，事先保留原版本 RPM；配置备份不能代替旧二进制。
 
@@ -46,14 +46,16 @@ sudo bash install-php71.sh --restart-services \
 
 ```bash
 rpm -qf /usr/bin/php
-# php71w-cli-7.1.33-1.w7.cve20261025.r1.el7.x86_64
+# php71w-cli-7.1.33-1.w7.cve20261025.r2.el7.x86_64
 php -v
-# PHP 7.1.33-cve20261025-r1 ...
+# PHP 7.1.33-cve20261025-r2 ...
 php -n /usr/local/share/php71w-cve/verify-patch.php
 php -r 'echo PHP_CVE_PATCH_ID, PHP_EOL, PHP_CVE_PATCH_BUILD, PHP_EOL;'
-# CVE-2026-109618+CVE-2026-109619;r1
+# CVE-2026-109618+CVE-2026-109619;r2
 # <40 位源码提交号>
 php -i | grep 'CVE Patch'
+# 纯 FPM 环境：
+php-fpm -i | grep -E 'CVE Patch|PHP Version'
 ```
 
 版本后缀与常量编译在二进制中，`BUILDINFO.json` 记录构建来源；Actions 验证实际缓解行为。标识证明当前进程使用该构建，不能证明所有扩展或其它安全问题均已修复。
@@ -70,9 +72,11 @@ echo defined('PHP_CVE_PATCH_BUILD') ? PHP_CVE_PATCH_BUILD : 'unknown', "\n";
 
 ## Actions 构建及发布
 
-Actions → **CentOS 7.9 Webtatic-compatible RPMs** → Run workflow。默认发布标签 `v7.1.33-cve20261025-r1`；关闭 `publish` 可只生成构建产物。所有测试成功后才创建 Release 和标签，不覆盖已有发布。
+Actions → **CentOS 7.9 Webtatic-compatible RPMs** → Run workflow。默认发布标签 `v7.1.33-cve20261025-r2`；关闭 `publish` 可只生成构建产物。所有测试成功后才创建 Release 和标签，不覆盖已有发布。
 
 固定 CentOS 7.9 amd64 容器内构建 Webtatic 子包，产出二进制 RPM 合集、源码 RPM、SHA256、包清单、构建信息。新容器验证安装和配置保留；CLI 验证标识/嵌套变量/字符串/OOM；FPM 验证同一 worker 连续请求、multipart 上限、文件上传、上传进度关闭和 OOM 后 worker 重建。
+
+r2 进一步补齐超大分配对齐溢出检查和三个处理器栈的请求间复位，清理重复的 VM 检查。Actions 增加 SIZE_MAX 分配探针、VM 重新生成一致性、真实 r1→r2 纯 FPM/Apache 升级、重复请求和异常清理测试。详见 [源码核对记录](docs/AUDIT-2026-10-25.md)。
 
 打包来源见 [packaging/PROVENANCE.md](packaging/PROVENANCE.md)。
 

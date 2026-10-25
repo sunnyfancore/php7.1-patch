@@ -418,6 +418,11 @@ void shutdown_executor(void) /* {{{ */
 	ZVAL_UNDEF(&EG(user_error_handler));
 	ZVAL_UNDEF(&EG(user_exception_handler));
 	EG(user_error_handler_error_reporting) = 0;
+	/* Cleanup callbacks may bail out before zend_stack_clean() resets these.
+	 * Keep the element sizes: PHP 7.1 uses zend_stack, not zend_llist here. */
+	zend_stack_init(&EG(user_error_handlers_error_reporting), sizeof(int));
+	zend_stack_init(&EG(user_error_handlers), sizeof(zval));
+	zend_stack_init(&EG(user_exception_handlers), sizeof(zval));
 	EG(error_handling) = EH_NORMAL;
 	EG(exception) = NULL;
 	EG(prev_exception) = NULL;

@@ -32,4 +32,8 @@ gpgcheck=1
 gpgkey=file:///src/packaging/keys/RPM-GPG-KEY-EPEL-7
 REPOS
 printf '%s\n' '028b9accc59bab1d21f2f3f544df5469910581e728a64fd8c411a725a82300c2  /src/packaging/keys/RPM-GPG-KEY-EPEL-7' | sha256sum -c -
-yum -y install ca-certificates rpm-build redhat-rpm-config yum-utils autoconf automake bison re2c patch make gcc gcc-c++ cpio git
+if [[ ${1:-} == --runtime ]]; then
+    yum -y install ca-certificates
+else
+    yum -y install ca-certificates rpm-build redhat-rpm-config yum-utils autoconf automake bison re2c patch make gcc gcc-c++ cpio git
+fi

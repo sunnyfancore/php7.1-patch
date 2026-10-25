@@ -1,5 +1,16 @@
 <?php
 header('Content-Type: application/json');
+if (isset($_GET['handlers'])) {
+    ini_set('display_errors', '0');
+    class AuditHandler {
+        function __invoke() { return false; }
+        function __destruct() { trigger_error('CI fatal handler cleanup', E_USER_ERROR); }
+    }
+    for ($i = 0; $i < 3; $i++) {
+        set_error_handler(new AuditHandler());
+        set_exception_handler(new AuditHandler());
+    }
+}
 if (isset($_GET['oom'])) {
     ini_set('memory_limit', '8M');
     $items = []; while (true) { $items[] = str_repeat('x', 1024); }

@@ -19,7 +19,7 @@ curl -fL --retry 3 -o install.sh https://ghfast.top/https://raw.githubuserconten
 下列命令用于手动下载并校验 Release 安装器：
 
 ```bash
-TAG=v7.1.33-cve20261025-r1
+TAG=v7.1.33-cve20261025-r2
 BASE="https://github.com/sunnyfancore/php7.1-patch/releases/download/$TAG"
 curl -fL --retry 3 -o install-php71.sh "$BASE/install-php71.sh"
 curl -fL --retry 3 -o SHA256SUMS "$BASE/SHA256SUMS"
@@ -38,8 +38,13 @@ php -n /usr/local/share/php71w-cve/verify-patch.php
 php -r 'echo PHP_CVE_PATCH_ID, PHP_EOL, PHP_CVE_PATCH_BUILD, PHP_EOL;'
 ```
 
-应显示 `7.1.33-cve20261025-r1`、`CVE-2026-109618+CVE-2026-109619;r1` 和源码提交号。CLI 和网站/FPM 可能运行不同进程，网站也需核对常量；常驻队列进程需重启。`--restart-services` 检查并重启正在运行的 php-fpm，以及使用 mod_php71w 的 httpd。
+应显示 `7.1.33-cve20261025-r2`、`CVE-2026-109618+CVE-2026-109619;r2` 和源码提交号。CLI 和网站/FPM 可能运行不同进程，网站也需核对常量；常驻队列进程需重启。`--restart-services` 检查并重启正在运行的 php-fpm，以及使用 mod_php71w 的 httpd。
 
 发布前 Actions 检查 CentOS 7.9 RPM 构建、干净安装、配置保留、CLI/OOM，以及 FPM 同一 worker 连续请求、multipart 上限、上传进度关闭和 OOM 后 worker 重建。
 
 行为变化：分配器 OOM 立即退出、不执行 shutdown 回调；session 上传进度关闭；新增 multipart 分段限制。PHP 7.1 与 CentOS 7 均已停止维护，本包只覆盖指定两个 CVE 的缓解，不代表其它漏洞全部修复。原有第三方扩展仍需按业务验证。配置备份不包含旧版本 RPM，如需回退请预先保留原 RPM。
+
+
+r2 补齐超大分配对齐溢出检查及三个处理器栈复位，清理重复 VM 检查；安装器支持纯 FPM，并核对确切构建、已安装 RPM 和扩展保留。服务活动状态在升级前记录，重启失败返回非零。`--no-restart` 仅跳过安装器重启，旧版本 RPM 脚本可能仍重启 FPM，升级请安排维护窗口。r2 RPM 不再主动触发该旧脚本行为。
+
+新增 Actions 验证 SIZE_MAX 分配安全退出、VM 生成一致性、真实 r1→r2 纯 FPM/Apache 升级、HTTP 请求、重复请求和异常处理器清理。

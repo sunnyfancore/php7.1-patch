@@ -1,0 +1,23 @@
+#!/bin/bash
+set -euo pipefail
+# Build/test only. No probe extension is included in any published RPM.
+yum -y --setopt=localpkg_gpgcheck=0 localinstall /src/dist/rpms/php71w-common-*.rpm /src/dist/rpms/php71w-cli-*.rpm /src/dist/rpms/php71w-devel-*.rpm
+gcc -shared -fPIC $(php-config --includes) /src/ci/allocator-probe.c -o /tmp/allocator-probe.so
+rm -f /tmp/allocator-shutdown
+set +e
+timeout 15 php -n -d extension=/tmp/allocator-probe.so -r '
+register_shutdown_function(function() { file_put_contents("/tmp/allocator-shutdown", "ran"); });
+audit_huge_allocation();' >/tmp/allocator.stdout 2>/tmp/allocator.stderr
+status=$?
+set -e
+[[ $status -eq 1 ]]
+grep -q 'Possible integer overflow in huge memory allocation' /tmp/allocator.stderr
+[[ ! -e /tmp/allocator-shutdown ]]
+echo 'PASS: SIZE_MAX huge allocation exits safely without shutdown callbacks'
+# Regeneration must reproduce the checked-in VM, including every specialized
+# concat handler. Use a scratch copy so the checkout remains unchanged.
+mkdir -p /tmp/vm-regeneration
+cp /src/Zend/zend_vm_{gen.php,def.h,execute.skl} /tmp/vm-regeneration/
+php -n /tmp/vm-regeneration/zend_vm_gen.php
+cmp /src/Zend/zend_vm_execute.h /tmp/vm-regeneration/zend_vm_execute.h
+echo 'PASS: generated VM matches zend_vm_def.h'

@@ -5,7 +5,7 @@ on:
       release_tag:
         description: Release tag created only after all build and runtime checks pass
         required: true
-        default: v7.1.33-cve20261025-r1
+        default: v7.1.33-cve20261025-r2
       publish:
         description: Publish tested binaries to GitHub Releases
         type: boolean
@@ -39,7 +39,7 @@ jobs:
       - name: Validate release identity
         shell: bash
         run: |
-          [[ "$RELEASE_TAG" =~ ^v7\.1\.33-cve20261025-r1$ ]]
+          [[ "$RELEASE_TAG" =~ ^v7\.1\.33-cve20261025-r2$ ]]
       - name: Build RPMs inside CentOS 7.9 / glibc 2.17
         if: inputs.reuse_run_id == ''
         run: |
@@ -59,8 +59,9 @@ jobs:
           COMPILED_SOURCE=$(python3 -c 'import json; print(json.load(open("dist/BUILDINFO.json"))["source_commit"])')
           [[ "$COMPILED_SOURCE" =~ ^[a-f0-9]{40}$ ]]
           git fetch --no-tags --depth=1 origin "$COMPILED_SOURCE"
-          git diff --exit-code "$COMPILED_SOURCE" HEAD -- Zend main ext TSRM configure configure.in build
+          python3 ci/check-reuse.py "$COMPILED_SOURCE"
           echo "SOURCE_COMMIT=$COMPILED_SOURCE" >> "$GITHUB_ENV"
+          cp ci/verify-patch.php dist/verify-patch.php
           cp packaging/install-rpms.sh dist/install-php71.sh
           sed -i "s/@RELEASE_TAG@/$RELEASE_TAG/g" dist/install-php71.sh
           cp packaging/RELEASE-NOTES.md dist/RELEASE-NOTES.md
@@ -95,12 +96,26 @@ jobs:
             sha256sum -c /tmp/php-ini-before
             exec /usr/sbin/php-fpm -F -y /src/ci/fpm-test.conf'
           python3 ci/test-fpm.py | tee dist/fpm-test.log
+      - name: Test upgrades from r1 with FPM-only and Apache-only installations
+        run: |
+          mkdir -p baseline
+          curl -fL --retry 3 https://github.com/sunnyfancore/php7.1-patch/releases/download/v7.1.33-cve20261025-r1/php71w-centos7.9-x86_64-rpms.tar.gz -o baseline/r1.tar.gz
+          echo 'f2faa451aede9f76458000c9e6d801ccf933051a85361b01bbc85c9c2bb3db57  baseline/r1.tar.gz' | sha256sum -c -
+          tar -xzf baseline/r1.tar.gz -C baseline
+          docker run -d --name php71-fpm-only -p 127.0.0.1:9073:9071 \
+            -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash /src/ci/test-sapi-upgrade.sh fpm
+          FPM_TEST_PORT=9073 python3 ci/test-fpm.py | tee dist/fpm-only-test.log
+          docker run -d --name php71-apache -p 127.0.0.1:9072:9072 \
+            -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash /src/ci/test-sapi-upgrade.sh apache
+          python3 ci/test-apache.py | tee dist/apache-test.log
       - name: Collect runtime results
         if: always()
         run: |
           mkdir -p dist
           docker logs php71-runtime > dist/runtime-test.log 2>&1 || true
-          docker rm -f php71-runtime || true
+          docker logs php71-fpm-only > dist/fpm-only-install.log 2>&1 || true
+          docker logs php71-apache > dist/apache-install.log 2>&1 || true
+          docker rm -f php71-runtime php71-fpm-only php71-apache || true
           sudo chown -R "$(id -u):$(id -g)" dist
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
@@ -116,9 +131,9 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" \
             --target "$GITHUB_SHA" \
-            --title "PHP 7.1.33 CVE mitigations r1 — CentOS 7.9 x86_64 RPMs" \
+            --title "PHP 7.1.33 CVE mitigations r2 — CentOS 7.9 x86_64 RPMs" \
             --notes-file dist/RELEASE-NOTES.md \
             dist/php71w-centos7.9-x86_64-rpms.tar.gz \
             dist/*.src.rpm dist/install-php71.sh dist/SHA256SUMS \
             dist/BUILDINFO.json dist/PACKAGES.tsv dist/CONFIGFILES.txt \
-            dist/verify-patch.php dist/fpm-test.log dist/runtime-test.log
+            dist/verify-patch.php dist/*test.log dist/*install.log

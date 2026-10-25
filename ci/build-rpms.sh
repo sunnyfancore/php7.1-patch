@@ -32,7 +32,7 @@ sed -i "s/@RELEASE_TAG@/${RELEASE_TAG}/g" dist/install-php71.sh
 cp packaging/RELEASE-NOTES.md dist/RELEASE-NOTES.md
 python - <<'PY'
 import json,os,subprocess
-d={'version':'7.1.33-cve20261025-r1','patch_id':'CVE-2026-109618+CVE-2026-109619;r1',
+d={'version':'7.1.33-cve20261025-r2','patch_id':'CVE-2026-109618+CVE-2026-109619;r2',
    'source_commit':os.environ['SOURCE_COMMIT'],'release_tag':os.environ['RELEASE_TAG'],
    'target':'CentOS 7.9 x86_64','glibc':subprocess.check_output(['getconf','GNU_LIBC_VERSION']).decode().strip(),
    'webtatic_packaging_commit':'36d3aeb770d2133a7600ec229f599adaff3c2f3b',
@@ -42,3 +42,4 @@ with open('dist/BUILDINFO.json','w') as f: json.dump(d,f,indent=2,sort_keys=True
 PY
 tar -czf dist/php71w-centos7.9-x86_64-rpms.tar.gz -C dist rpms PACKAGES.tsv BUILDINFO.json CONFIGFILES.txt verify-patch.php RPM-GPG-KEY-EPEL-7
 (cd dist && sha256sum *.gz *.rpm *.json *.tsv *.txt *.php *.sh *.md > SHA256SUMS)
+bash ci/test-allocator.sh | tee dist/allocator-test.log

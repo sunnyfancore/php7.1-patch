@@ -18,5 +18,15 @@ set -e
 [[ $STATUS -eq 1 ]]
 grep -q 'Allowed memory size' /tmp/oom.stderr
 [[ ! -e "$MARKER" ]]
+set +e
+timeout 15 php -n -r '
+register_shutdown_function(function() use ($argv) { file_put_contents($argv[1], "ran"); });
+str_repeat("xx", PHP_INT_MAX);
+' "$MARKER" >/tmp/overflow.stdout 2>/tmp/overflow.stderr
+STATUS=$?
+set -e
+[[ $STATUS -eq 1 ]]
+grep -q 'Possible integer overflow' /tmp/overflow.stderr
+[[ ! -e "$MARKER" ]]
 php-fpm -t
 echo 'PASS: CLI, build identity, dynamic linking, OOM, FPM configuration'

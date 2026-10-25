@@ -112,7 +112,7 @@ Name: %{?scl_prefix}php
 Name: php71w
 %endif
 Version: 7.1.33
-Release: 1.w7.cve20261025.r1%{?dist}
+Release: 1.w7.cve20261025.r2%{?dist}
 # All files licensed under PHP version 3.01, except
 # Zend is licensed under Zend
 # TSRM is licensed under BSD
@@ -1045,7 +1045,7 @@ rm -f ext/sockets/tests/mcast_ipv?_recv.phpt
 
 # Safety check for API version change.
 pver=$(sed -n '/#define PHP_VERSION /{s/.* "//;s/".*$//;p}' main/php_version.h)
-if test "x${pver}" != "x%{version}-cve20261025-r1"; then
+if test "x${pver}" != "x%{version}-cve20261025-r2"; then
    : Error: Upstream PHP version is now ${pver}, expecting %{version}%{?rcver}.
    : Update the version/rcver macros and rebuild.
    exit 1
@@ -1714,7 +1714,7 @@ exit 0
 %systemd_preun %{?scl_prefix}php-fpm.service
 
 %postun fpm
-%systemd_postun_with_restart %{?scl_prefix}php-fpm.service
+%systemd_postun %{?scl_prefix}php-fpm.service
 
 # Handle upgrading from SysV initscript to native systemd unit.
 # We can tell if a SysV version of php-fpm was previously installed by

@@ -21,8 +21,8 @@ curl -fL --retry 3 -o install.sh https://raw.githubusercontent.com/sunnyfancore/
 Mirror acceleration (bootstrap, installer, RPM bundle and checksums):
 curl -fL --retry 3 -o install.sh https://ghfast.top/https://raw.githubusercontent.com/sunnyfancore/php7.1-patch/main/install.sh && sudo bash install.sh --mirror-prefix https://ghfast.top/
 
-The proxy prefix is replaceable. Existing FPM/httpd services are restarted
-after upgrading unless --no-restart is supplied.
+The proxy prefix is replaceable. --no-restart skips installer restarts;
+older RPM scriptlets may still restart FPM during upgrade.
 HELP
             exit 0 ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
