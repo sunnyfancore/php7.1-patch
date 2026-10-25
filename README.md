@@ -37,6 +37,8 @@ sudo bash install-php71.sh --restart-services
 
 本项目 RPM 尚未签名，使用 HTTPS 和 SHA256 校验；发行版依赖仍检查官方 GPG 签名。依赖仅对本次事务启用临时 CentOS/EPEL 归档仓库，不改已有 `.repo`。若要回退，事先保留原版本 RPM；配置备份不能代替旧二进制。
 
+恢复到未打补丁的 PHP 7.1.33，见 [原版恢复说明](docs/RESTORE-PHP-7.1.33.md)：包含 Webtatic 原版同名 RPM 下载、签名校验、统一降级、配置与服务验收，以及 PHP 官方源码归档地址。当前未提供自动回滚功能。
+
 已下载二进制包可这样安装，缺少的系统依赖仍需网络：
 
 ```bash
