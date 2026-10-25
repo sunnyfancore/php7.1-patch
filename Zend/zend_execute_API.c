@@ -411,6 +411,18 @@ void shutdown_executor(void) /* {{{ */
 	}
 
 	EG(active) = 0;
+
+	/* Reset request state that may be consumed before init_executor() of the
+	 * next request on the same worker. Diagnostics emitted while applying INI
+	 * settings, for example, run before the executor is initialized. */
+	ZVAL_UNDEF(&EG(user_error_handler));
+	ZVAL_UNDEF(&EG(user_exception_handler));
+	EG(user_error_handler_error_reporting) = 0;
+	EG(error_handling) = EH_NORMAL;
+	EG(exception) = NULL;
+	EG(prev_exception) = NULL;
+	EG(objects_store).object_buckets = NULL;
+	EG(objects_store).top = 1;
 }
 /* }}} */
 
