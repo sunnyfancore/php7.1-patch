@@ -1,0 +1,51 @@
+name: Isolated r2 runtime preflight (no publication)
+on: workflow_dispatch
+permissions:
+  contents: read
+  actions: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CENTOS_IMAGE: centos@sha256:dead07b4d8ed7e29e98de0f4504d87e8880d4347859d839686a31da35a3b532f
+      SOURCE_COMMIT: bb125ab299c0100106a31dd64e4cf04b384ef9a3
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Download already compiled source for isolated test development
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 40193043892 --name centos7.9-rpms-and-logs --dir dist
+          (cd dist && sha256sum -c SHA256SUMS)
+      - name: Check native regressions in a writable scratch directory
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash -c '
+            set -euo pipefail
+            bash /src/ci/setup-centos7.sh
+            bash /src/ci/test-allocator.sh' | tee dist/preflight-native.log
+      - name: Check Apache requests with its server explicitly provisioned
+        run: |
+          mkdir baseline
+          curl -fL https://github.com/sunnyfancore/php7.1-patch/releases/download/v7.1.33-cve20261025-r1/php71w-centos7.9-x86_64-rpms.tar.gz -o baseline/r1.tar.gz
+          echo 'f2faa451aede9f76458000c9e6d801ccf933051a85361b01bbc85c9c2bb3db57  baseline/r1.tar.gz' | sha256sum -c -
+          tar -xzf baseline/r1.tar.gz -C baseline
+          docker run -d --name php71-apache -p 127.0.0.1:9072:9072 -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash -c '
+            set -euo pipefail
+            bash /src/ci/setup-centos7.sh --runtime
+            yum -y install httpd
+            exec bash /src/ci/test-sapi-upgrade.sh apache'
+          TEST_CONTAINER_NAME=php71-apache python3 ci/test-apache.py | tee dist/preflight-apache.log
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          docker logs php71-apache > dist/preflight-apache-install.log 2>&1 || true
+          docker rm -f php71-apache || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: isolated-preflight-logs
+          path: dist/preflight-*.log
