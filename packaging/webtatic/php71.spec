@@ -213,6 +213,9 @@ use of PHP coding is probably as a replacement for CGI scripts.
 Group: Development/Languages
 Summary: PHP module for the Apache HTTP Server
 BuildRequires: httpd-devel >= 2.0.46-1
+Requires: httpd-mmn = %{_httpd_mmn}
+Requires: %{name}-common%{?_isa} = %{version}-%{release}
+Requires(pre): httpd
 %if 0%{!?scl:1}
 %if %{with_zts}
 Provides: php-zts = %{version}-%{release}
