@@ -102,7 +102,7 @@ jobs:
             bash /src/dist/install-php71.sh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS
             sha256sum -c /tmp/php-ini-before
             exec /usr/sbin/php-fpm -F -y /src/ci/fpm-test.conf'
-          python3 ci/test-fpm.py | tee dist/fpm-test.log
+          TEST_CONTAINER_NAME=php71-runtime python3 ci/test-fpm.py | tee dist/fpm-test.log
       - name: Test upgrades from r1 with FPM-only and Apache-only installations
         run: |
           mkdir -p baseline
@@ -111,10 +111,10 @@ jobs:
           tar -xzf baseline/r1.tar.gz -C baseline
           docker run -d --name php71-fpm-only -p 127.0.0.1:9073:9071 \
             -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash /src/ci/test-sapi-upgrade.sh fpm
-          FPM_TEST_PORT=9073 python3 ci/test-fpm.py | tee dist/fpm-only-test.log
+          FPM_TEST_PORT=9073 TEST_CONTAINER_NAME=php71-fpm-only python3 ci/test-fpm.py | tee dist/fpm-only-test.log
           docker run -d --name php71-apache -p 127.0.0.1:9072:9072 \
             -v "$GITHUB_WORKSPACE:/src:ro" "$CENTOS_IMAGE" bash /src/ci/test-sapi-upgrade.sh apache
-          python3 ci/test-apache.py | tee dist/apache-test.log
+          TEST_CONTAINER_NAME=php71-apache python3 ci/test-apache.py | tee dist/apache-test.log
       - name: Collect runtime results
         if: always()
         run: |

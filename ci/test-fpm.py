@@ -4,6 +4,7 @@ import json
 import os
 import socket
 import struct
+import subprocess
 import time
 
 
@@ -84,6 +85,12 @@ def request(fields=(), upload=False, query='', extra_headers=False):
 def exercise(request, transport):
     deadline = time.monotonic() + 360
     while True:
+        container = os.environ.get('TEST_CONTAINER_NAME')
+        if container:
+            state = subprocess.run(['docker', 'inspect', '-f', '{{.State.Running}}', container], capture_output=True, text=True)
+            if state.returncode or state.stdout.strip() != 'true':
+                subprocess.run(['docker', 'logs', container], check=False)
+                raise RuntimeError('Runtime container exited before serving requests: ' + container)
         try:
             result = request([('ready', '1')])
             break
