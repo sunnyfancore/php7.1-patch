@@ -19,5 +19,5 @@ echo 'PASS: SIZE_MAX huge allocation exits safely without shutdown callbacks'
 mkdir -p /tmp/vm-regeneration
 cp /src/Zend/zend_vm_{gen.php,def.h,execute.skl} /tmp/vm-regeneration/
 php -n /tmp/vm-regeneration/zend_vm_gen.php
-cmp /src/Zend/zend_vm_execute.h /tmp/vm-regeneration/zend_vm_execute.h
-echo 'PASS: generated VM matches zend_vm_def.h'
+diff -u -B /src/Zend/zend_vm_execute.h /tmp/vm-regeneration/zend_vm_execute.h
+echo 'PASS: generated VM matches zend_vm_def.h (ignoring original release blank lines)'

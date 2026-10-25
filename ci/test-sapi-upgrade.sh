@@ -14,6 +14,12 @@ sha256sum -c /tmp/php-ini-before
 test ! -e /usr/bin/php
 echo "PASS: r1 to r2 $mode-only upgrade, no CLI dependency and configuration retained"
 if [[ "$mode" == fpm ]]; then
+    echo 'extension=ci_nonexistent_extension.so' > /etc/php.d/zz-ci-invalid.ini
+    if bash /src/dist/install-php71.sh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS; then
+        echo 'Broken extension incorrectly accepted' >&2; exit 1
+    fi
+    rm /etc/php.d/zz-ci-invalid.ini
+    echo 'PASS: extension startup diagnostics are rejected'
     # Test service bookkeeping against a deterministic systemctl double; the
     # actual FPM process and requests below use the real binary.
     mkdir -p /tmp/service-bin /run/systemd/system

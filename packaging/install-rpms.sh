@@ -50,7 +50,7 @@ read -r EXPECTED_VERSION EXPECTED_PATCH EXPECTED_BUILD < <(python - "$TMP/BUILDI
 import json, sys
 with open(sys.argv[1]) as handle: data = json.load(handle)
 if data['release_tag'] != sys.argv[2]: raise SystemExit('Bundle release tag mismatch')
-print(data['version'], data['patch_id'], data['source_commit'])
+sys.stdout.write('%s %s %s\n' % (data['version'], data['patch_id'], data['source_commit']))
 PY
 )
 [[ "$EXPECTED_BUILD" =~ ^[a-f0-9]{40}$ ]] || { echo 'Invalid build metadata' >&2; exit 1; }

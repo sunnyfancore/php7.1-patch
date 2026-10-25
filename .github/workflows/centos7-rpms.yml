@@ -117,6 +117,9 @@ jobs:
           docker logs php71-apache > dist/apache-install.log 2>&1 || true
           docker rm -f php71-runtime php71-fpm-only php71-apache || true
           sudo chown -R "$(id -u):$(id -g)" dist
+      - name: Finalize checksums including verification logs
+        if: success()
+        run: (cd dist && sha256sum *.gz *.rpm *.json *.tsv *.txt *.php *.sh *.md *.log > SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
