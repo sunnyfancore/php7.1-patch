@@ -10,6 +10,10 @@ on:
         description: Publish tested binaries to GitHub Releases
         type: boolean
         default: true
+      reuse_run_id:
+        description: Optional successful compilation artifact to retest without recompiling unchanged PHP source
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -24,6 +28,7 @@ jobs:
     timeout-minutes: 120
     permissions:
       contents: write
+      actions: read
     env:
       CENTOS_IMAGE: centos@sha256:dead07b4d8ed7e29e98de0f4504d87e8880d4347859d839686a31da35a3b532f
       SOURCE_COMMIT: ${{ github.sha }}
@@ -36,11 +41,41 @@ jobs:
         run: |
           [[ "$RELEASE_TAG" =~ ^v7\.1\.33-cve20261025-r1$ ]]
       - name: Build RPMs inside CentOS 7.9 / glibc 2.17
+        if: inputs.reuse_run_id == ''
         run: |
           docker pull "$CENTOS_IMAGE"
           docker run --rm -v "$GITHUB_WORKSPACE:/src" \
             -e SOURCE_COMMIT -e RELEASE_TAG -e RUN_URL -e JOBS=2 \
             "$CENTOS_IMAGE" bash /src/ci/build-rpms.sh
+      - name: Reuse compiled RPMs when PHP source is unchanged
+        if: inputs.reuse_run_id != ''
+        env:
+          REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$REUSE_RUN_ID" =~ ^[0-9]+$ ]]
+          gh run download "$REUSE_RUN_ID" --name centos7.9-rpms-and-logs --dir dist
+          (cd dist && sha256sum -c SHA256SUMS)
+          COMPILED_SOURCE=$(python3 -c 'import json; print(json.load(open("dist/BUILDINFO.json"))["source_commit"])')
+          [[ "$COMPILED_SOURCE" =~ ^[a-f0-9]{40}$ ]]
+          git fetch --no-tags --depth=1 origin "$COMPILED_SOURCE"
+          git diff --exit-code "$COMPILED_SOURCE" HEAD -- Zend main ext TSRM configure configure.in build
+          echo "SOURCE_COMMIT=$COMPILED_SOURCE" >> "$GITHUB_ENV"
+          cp packaging/install-rpms.sh dist/install-php71.sh
+          sed -i "s/@RELEASE_TAG@/$RELEASE_TAG/g" dist/install-php71.sh
+          cp packaging/RELEASE-NOTES.md dist/RELEASE-NOTES.md
+          python3 - <<'PY'
+          import json, os
+          path = 'dist/BUILDINFO.json'
+          with open(path) as handle: data = json.load(handle)
+          data['verification_run_url'] = os.environ['RUN_URL']
+          data['installer_source_commit'] = os.environ['GITHUB_SHA']
+          with open(path, 'w') as handle: json.dump(data, handle, indent=2, sort_keys=True)
+          PY
+          tar -czf dist/php71w-centos7.9-x86_64-rpms.tar.gz -C dist rpms PACKAGES.tsv BUILDINFO.json CONFIGFILES.txt verify-patch.php RPM-GPG-KEY-EPEL-7
+          (cd dist && sha256sum *.gz *.rpm *.json *.tsv *.txt *.php *.sh *.md > SHA256SUMS)
+      - name: Prepare artifact permissions
+        run: sudo chown -R "$(id -u):$(id -g)" dist
       - name: Install and test in a fresh CentOS 7.9 container
         run: |
           docker run -d --name php71-runtime -p 127.0.0.1:9071:9071 \
@@ -48,8 +83,14 @@ jobs:
             set -euo pipefail
             bash /src/dist/install-php71.sh --fresh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS
             bash /src/ci/test-cli.sh
+            rpm -Uvh /src/dist/rpms/php71w-opcache-*.x86_64.rpm
+            php -m | grep "Zend OPcache"
             echo "; CI configuration preservation marker" >> /etc/php.ini
+            echo "; CI opcode configuration preservation marker" >> /etc/php.d/opcache.ini
             sha256sum /etc/php.ini > /tmp/php-ini-before
+            sha256sum /etc/php.d/opcache.ini >> /tmp/php-ini-before
+            rpm -Uvh --replacepkgs /src/dist/rpms/php71w-common-*.x86_64.rpm /src/dist/rpms/php71w-cli-*.x86_64.rpm /src/dist/rpms/php71w-fpm-*.x86_64.rpm /src/dist/rpms/php71w-opcache-*.x86_64.rpm
+            sha256sum -c /tmp/php-ini-before
             bash /src/dist/install-php71.sh --package /src/dist/php71w-centos7.9-x86_64-rpms.tar.gz --checksums /src/dist/SHA256SUMS
             sha256sum -c /tmp/php-ini-before
             exec /usr/sbin/php-fpm -F -y /src/ci/fpm-test.conf'
