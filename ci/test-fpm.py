@@ -50,6 +50,10 @@ def request(fields=(), upload=False, query='', extra_headers=False):
         'CONTENT_LENGTH': str(len(body)), 'SERVER_NAME': 'localhost', 'SERVER_PORT': '80',
         'REMOTE_ADDR': '127.0.0.1', 'HTTP_COOKIE': 'PHPSESSID=php71cvetest',
     }
+    if query == 'startup_oom=1':
+        params['PHP_VALUE'] = 'memory_limit=8M\npost_max_size=32M'
+    elif query == 'ini_diagnostic=1':
+        params['PHP_VALUE'] = 'date.timezone=CI/Invalid'
     encoded = b''
     for key, value in params.items():
         key, value = key.encode(), value.encode()
@@ -57,8 +61,10 @@ def request(fields=(), upload=False, query='', extra_headers=False):
     output, errors = b'', b''
     with socket.create_connection(('127.0.0.1', int(os.environ.get('FPM_TEST_PORT', '9071'))), timeout=5) as sock:
         sock.settimeout(20)
-        sock.sendall(record(1, struct.pack('!HB5x', 1, 0)) + record(4, encoded)
-                     + record(4) + record(5, body) + record(5))
+        sock.sendall(record(1, struct.pack('!HB5x', 1, 0)) + record(4, encoded) + record(4))
+        for offset in range(0, len(body), 65535):
+            sock.sendall(record(5, body[offset:offset + 65535]))
+        sock.sendall(record(5))
         while True:
             version, kind, request_id, length, padding, _ = struct.unpack('!BBHHBB', receive(sock, 8))
             content = receive(sock, length)
@@ -102,7 +108,7 @@ def exercise(request, transport):
     print('PASS ' + transport + ': duplicate/unused multipart headers are ignored')
     for index in range(10):
         result = request(query='handlers=1')
-        result = request([('after_cleanup', 'ok')])
+        result = request([('after_cleanup', 'ok')], query='ini_diagnostic=1')
         assert result['pid'] == pid and result['post'] == {'after_cleanup': 'ok'}, result
     print('PASS ' + transport + ': repeated fatal handler cleanup and subsequent requests')
     try:
@@ -115,6 +121,16 @@ def exercise(request, transport):
     assert result['pid'] != pid and result['post'] == {'after_oom': 'ok'}, result
     assert result['patch'] == 'CVE-2026-109618+CVE-2026-109619;r2'
     print('PASS ' + transport + ': OOM worker exits; master replaces it and subsequent requests succeed')
+    pid = result['pid']
+    try:
+        request([('large', 'x' * (12 * 1024 * 1024))], query='startup_oom=1')
+    except (OSError, RuntimeError, json.JSONDecodeError):
+        pass
+    else:
+        raise AssertionError('Startup OOM unexpectedly completed normally')
+    result = request([('after_startup_oom', 'ok')])
+    assert result['pid'] != pid and result['post'] == {'after_startup_oom': 'ok'}, result
+    print('PASS ' + transport + ': multipart startup OOM exits without request cleanup; next worker serves requests')
 
 
 if __name__ == '__main__':

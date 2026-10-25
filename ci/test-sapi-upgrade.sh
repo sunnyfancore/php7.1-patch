@@ -53,7 +53,16 @@ php_admin_value max_multipart_body_parts 2
 php_admin_flag session.upload_progress.enabled on
 php_admin_flag session.upload_progress.cleanup off
 php_admin_value session.save_path /tmp
+<Files startup-fixture.php>
+    php_admin_value memory_limit 8M
+    php_admin_value post_max_size 32M
+</Files>
+<Files ini-fixture.php>
+    php_value date.timezone CI/Invalid
+</Files>
 HTTPD
 cp /src/ci/fpm-fixture.php /var/www/html/fpm-fixture.php
+cp /src/ci/fpm-fixture.php /var/www/html/startup-fixture.php
+cp /src/ci/fpm-fixture.php /var/www/html/ini-fixture.php
 httpd -t
 exec /usr/sbin/httpd -DFOREGROUND
