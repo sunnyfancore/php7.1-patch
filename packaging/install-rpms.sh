@@ -99,7 +99,7 @@ elif rpm -q php71w-fpm >/dev/null 2>&1; then MODULE_BIN=/usr/sbin/php-fpm
 fi
 capture_modules() {
     local target=$1
-    "$MODULE_BIN" -d display_errors=stderr -d log_errors=0 -m > "$target" 2> "$target.stderr"
+    "$MODULE_BIN" -d display_errors=stderr -d display_startup_errors=1 -d log_errors=0 -m > "$target" 2> "$target.stderr"
     if [[ -s "$target.stderr" ]]; then cat "$target.stderr" >&2; echo 'PHP startup diagnostics must be resolved before reporting success' >&2; return 1; fi
     LC_ALL=C sort -u -o "$target" "$target"
 }

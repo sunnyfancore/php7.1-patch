@@ -31,3 +31,9 @@ cp /src/Zend/zend_vm_{gen.php,def.h,execute.skl} /tmp/vm-regeneration/
 php -n /tmp/vm-regeneration/zend_vm_gen.php
 diff -u -B /src/Zend/zend_vm_execute.h /tmp/vm-regeneration/zend_vm_execute.h
 echo 'PASS: generated VM matches zend_vm_def.h (ignoring original release blank lines)'
+# Reuse the upstream regressions for the string/array paths touched here.
+mkdir -p /tmp/php71-upstream-tests
+cp /src/Zend/tests/concat_*.phpt /src/Zend/tests/parse_str_with_unpack.phpt /src/Zend/tests/this_in_parse_str.phpt /tmp/php71-upstream-tests/
+cp /src/ext/standard/tests/strings/{parse_str*,str_repeat*,str_split*}.phpt /tmp/php71-upstream-tests/
+NO_INTERACTION=1 REPORT_EXIT_STATUS=1 TEST_PHP_EXECUTABLE=/usr/bin/php \
+    php -n /src/run-tests.php -n -q --show-diff /tmp/php71-upstream-tests
